@@ -12,7 +12,11 @@ import (
 	"path/filepath"
 	"shim"
 	"strings"
+	"time"
 )
+
+//2013 02 21 0800
+var fixedDate = time.Date(2013, 02, 21, 8, 00, 00, 00, time.UTC)
 
 var filesToCopy = []string{"__init__.pyc", "proxy.pyc", "runtime.so"}
 
@@ -105,6 +109,8 @@ func generateZip(src string, name string) {
 
 		fileInfoHeader.Name = "handler/" + fileInfoHeader.Name
 
+		fileInfoHeader.SetModTime(fixedDate)
+
 		fileWriter, err := zipWriter.CreateHeader(fileInfoHeader)
 
 		if nil != err {
@@ -139,6 +145,7 @@ func generateZip(src string, name string) {
 	}
 
 	fileInfoHeader.Name = "handler.so"
+	fileInfoHeader.SetModTime(fixedDate)
 
 	fileWriter, err := zipWriter.CreateHeader(fileInfoHeader)
 
