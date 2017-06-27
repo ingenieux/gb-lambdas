@@ -12,6 +12,8 @@ func main() {
 		if newLogLevel, err := log.ParseLevel(lambdasLogLevel); nil == err {
 			log.SetLevel(newLogLevel)
 		}
+	} else {
+		log.SetLevel(log.InfoLevel)
 	}
 
 	checkGolangVersion()

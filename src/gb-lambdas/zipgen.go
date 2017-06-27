@@ -84,7 +84,9 @@ func generateZip(src string, name string) {
 
 	buildArgs := make([]string, 0)
 
-	buildArgs = append(buildArgs, "build", "-buildmode=plugin", `-ldflags=-w -s`, "-o", "pkg/"+name+".so", "-tags", `'+lambda'`)
+	soFile := "pkg/" + name + ".so"
+
+	buildArgs = append(buildArgs, "build", "-buildmode=plugin", `-ldflags=-w -s`, "-o", soFile, "-tags", `'+lambda'`)
 
 	buildArgs = append(buildArgs, fileList...)
 
@@ -114,6 +116,31 @@ func generateZip(src string, name string) {
 		log.Warnf("err: %v", err)
 
 		panic(err)
+	}
+
+	if upxBinary, err := exec.LookPath("upx"); nil == err && "" != upxBinary {
+		err = os.Chmod(soFile, os.FileMode(0755))
+
+		if nil != err {
+			log.Warnf("Oops: %v", err)
+
+			panic(err)
+		}
+
+		upxCommand := exec.Command(upxBinary, soFile)
+
+		upxCommand.Stdout = os.Stdout
+		upxCommand.Stderr = os.Stderr
+
+		log.Infof("Running upx: %v", upxCommand)
+
+		err = upxCommand.Run()
+
+		if nil != err {
+			log.Warnf("Oops: %v", err)
+
+			panic(err)
+		}
 	}
 
 	binDir := filepath.Join(projectDir, "bin")
@@ -194,7 +221,7 @@ func generateZip(src string, name string) {
 		}
 	}
 
-	stat, err := os.Stat("pkg/" + name + ".so")
+	stat, err := os.Stat(soFile)
 
 	if nil != err {
 		log.Warnf("err: %v", err)
@@ -221,7 +248,7 @@ func generateZip(src string, name string) {
 		panic(err)
 	}
 
-	soFileReader, err := os.OpenFile("pkg/"+name+".so", os.O_RDONLY, os.FileMode(0x660))
+	soFileReader, err := os.OpenFile(soFile, os.O_RDONLY, os.FileMode(0x660))
 
 	if nil != err {
 		log.Warnf("err: %v", err)

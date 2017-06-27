@@ -14,14 +14,24 @@ var Assets = rice.MustFindBox("assets")
 var GoVersionPrefix string
 
 func init() {
-	versionString, err := Assets.String("version")
+	versionString, err := Assets.String("goversion")
 
 	if nil != err {
 		log.Warnf("Oops: %v", err)
 		panic(err)
 	}
 
-	elements := strings.SplitN(versionString, " ", 3)
+	versionString = strings.TrimSpace(versionString)
 
-	GoVersionPrefix = strings.Join(elements, " ") + " "
+	elements := strings.SplitN(versionString, " ", 4)
+
+	GoVersionPrefix = strings.Join(elements[:3], " ") + " "
+
+	// Those two debug statements won't work. When debugging, change to Infof instead
+
+	debugf := log.Debugf
+
+	debugf("versionString from resource: %s (%q)", versionString, elements)
+
+	debugf("final: %s", GoVersionPrefix)
 }
