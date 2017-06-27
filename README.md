@@ -4,9 +4,12 @@ Uses [eawsy/aws-lambda-go-shim](github.com/eawsy/aws-lambda-go-shim)
 
 ## Building
 
-Requirements: make, Docker, golang, and [gb](https://github.com/constabulary/gb)
+Requirements: make, Docker, rice, golang, and [gb](https://github.com/constabulary/gb)
 
 Steps:
+
+  * go get github.com/constabulary/gb/...
+  * go get github.com/GeertJohan/go.rice/rice
 
   * clone, checkout, cd
   * ```gb vendor restore```
