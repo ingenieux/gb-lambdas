@@ -46,6 +46,7 @@ fabric.properties
 
 bin/
 pkg/
+src/shim/assets/*
 vendor/pkg/
 vendor/src/
 rice-box.go
