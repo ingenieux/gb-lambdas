@@ -2,6 +2,7 @@ package main
 
 import (
 	"archive/zip"
+	"errors"
 	"fmt"
 	log "github.com/sirupsen/logrus"
 	"go/parser"
@@ -16,11 +17,24 @@ import (
 )
 
 //2013 02 21 0800
-var fixedDate = time.Date(2013, 02, 21, 8, 00, 00, 00, time.UTC)
+var (
+	fixedDate = time.Date(2013, 02, 21, 8, 00, 00, 00, time.UTC)
 
-var filesToCopy = []string{"__init__.pyc", "proxy.pyc", "runtime.so"}
+	filesToCopy = []string{"__init__.pyc", "proxy.pyc", "runtime.so"}
+
+	EInvalidProjectDir = errors.New("Invalid Project Dir (variable: $GB_PROJECT_DIR)")
+	EInvalidGoRoot     = errors.New("Invalid GOROOT (variable: $GOROOT)")
+)
 
 func main() {
+	log.SetFormatter(&log.TextFormatter{})
+
+	if lambdasLogLevel := os.Getenv("GB_LAMBDAS_LOGLEVEL"); "" != lambdasLogLevel {
+		if newLogLevel, err := log.ParseLevel(lambdasLogLevel); nil == err {
+			log.SetLevel(newLogLevel)
+		}
+	}
+
 	lambdaMap := BuildLambdaMap()
 
 	log.Debugf("lambdaMap: %s", lambdaMap)
@@ -32,11 +46,60 @@ func main() {
 }
 
 func generateZip(src string, name string) {
+	log.Infof("Package: %s @ %s", name, src)
+
 	goBinary, err := exec.LookPath("go")
 
 	if nil != err {
+		log.Warnf("Oops: %v", err)
+
 		panic(err)
 	}
+
+	goRoot := os.Getenv("GOROOT")
+
+	if "" == goRoot {
+		log.Warnf("Oops: %v", EInvalidGoRoot)
+
+		panic(EInvalidGoRoot)
+	}
+
+	projectDir := os.Getenv("GB_PROJECT_DIR")
+
+	if "" == projectDir {
+		log.Warnf("Oops: %v", EInvalidProjectDir)
+
+		panic(EInvalidProjectDir)
+	}
+
+	log.Debugf("projectDir: %s", projectDir)
+
+	projectDir, err = filepath.Abs(projectDir)
+
+	if nil != err {
+		log.Warnf("Oops: %v", err)
+
+		panic(err)
+	}
+
+	goPath := make([]string, 0)
+
+	for keyToAppend, childPath := range map[string]string{".": "src", "vendor": "vendor/src"} {
+		pathToTest := filepath.Join(projectDir, childPath)
+		pathToAppend, _ := filepath.Abs(filepath.Join(projectDir, keyToAppend))
+
+		if stat, err := os.Stat(pathToTest); nil == err && stat.IsDir() {
+			log.Debugf("Appending path: %s", pathToAppend)
+
+			goPath = append(goPath, pathToAppend)
+		} else {
+			log.Debugf("Invalid path: %s (stat: %+v reason: %v)", pathToTest, stat, err)
+		}
+	}
+
+	goPathAsString := strings.Join(goPath, string(os.PathListSeparator))
+
+	log.Debugf("Using gopath: %s", goPathAsString)
 
 	fileList := buildFileList(src)
 
@@ -48,7 +111,7 @@ func generateZip(src string, name string) {
 
 	buildCmd := exec.Command(goBinary, buildArgs...)
 
-	buildCmd.Dir = os.Getenv("GB_PROJECT_DIR")
+	buildCmd.Dir = projectDir
 
 	log.Debugf("Project Dir: %s", buildCmd.Dir)
 
@@ -58,8 +121,10 @@ func generateZip(src string, name string) {
 
 	buildCmd.Env = []string{
 		"PATH=" + os.Getenv("PATH"),
-		"GOROOT=" + os.Getenv("GOROOT"),
-		"GOPATH=" + fmt.Sprintf("%s:%s/vendor", buildCmd.Dir, buildCmd.Dir),
+		"GOROOT=" + goRoot,
+		"GOPATH=" + goPathAsString,
+		"GOOS=linux",
+		"GOARCH=amd64",
 	}
 
 	log.Debugf("Running: %s with env: %s", buildCmd.Args, buildCmd.Env)
@@ -72,7 +137,29 @@ func generateZip(src string, name string) {
 		panic(err)
 	}
 
-	outputFile, err := os.OpenFile("bin/"+name+".zip", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.FileMode(0664))
+	binDir := filepath.Join(projectDir, "bin")
+
+	if stat, err := os.Stat(binDir); nil != err && os.IsNotExist(err) {
+		log.Debugf("Creating directory %s", binDir)
+
+		err = os.MkdirAll(binDir, 0777)
+
+		if nil != err {
+			log.Warnf("Oops: %v", err)
+
+			panic(err)
+		}
+	} else if stat.IsDir() {
+		err = fmt.Errorf("Invalid Binary Dir not a dir: %s", binDir)
+
+		log.Warnf("Oops: %v", err)
+
+		panic(err)
+	}
+
+	zipFile := filepath.Join(binDir, name+".zip")
+
+	outputFile, err := os.OpenFile(zipFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.FileMode(0664))
 
 	if nil != err {
 		log.Warnf("err: %v", err)
@@ -172,6 +259,8 @@ func generateZip(src string, name string) {
 	}
 
 	zipWriter.Close()
+
+	log.Infof("Created zip file '%s'", zipFile)
 }
 
 func BuildLambdaMap() map[string]string {
@@ -227,6 +316,8 @@ func buildFileList(path string) []string {
 	fileList, err := filepath.Glob(path + "/*.go")
 
 	if nil != err {
+		log.Warnf("Oops: %v", err)
+
 		panic(err)
 	}
 

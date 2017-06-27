@@ -41,12 +41,6 @@
 			"path": "/spew"
 		},
 		{
-			"importpath": "github.com/docopt/docopt-go",
-			"repository": "https://github.com/docopt/docopt-go",
-			"revision": "784ddc588536785e7299f7272f39101f7faccc3f",
-			"branch": "master"
-		},
-		{
 			"importpath": "github.com/jessevdk/go-flags",
 			"repository": "https://github.com/jessevdk/go-flags",
 			"revision": "5695738f733662da3e9afc2283bba6f3c879002d",
